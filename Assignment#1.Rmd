@@ -1,0 +1,697 @@
+---
+title: "Assignment #1"
+author: "Kevin Adington"
+date: "11/20/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+# LOAD LIBRARIES
+
+```{r}
+
+library(tidyverse)
+library(plotly)
+library(sf)
+library(tigris)
+library(leaflet)
+library(censusapi)
+
+Sys.setenv(CENSUS_KEY="c8aa67e4086b4b5ce3a8717f59faa9a28f611dab")
+
+```
+
+# LOAD ELECTRIC DATA
+
+```{r}
+
+year <- 2017
+quarters <- 1:4
+type <- "Electric"
+
+pge_17_elec <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_17_elec <- rbind(pge_17_elec,temp)
+
+  saveRDS(pge_17_elec, "pge_17_elec.rds")
+}
+
+year <- 2018
+quarters <- 1:4
+type <- "Electric"
+
+pge_18_elec <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_18_elec <- rbind(pge_18_elec,temp)
+
+  saveRDS(pge_18_elec, "pge_18_elec.rds")
+}
+
+year <- 2019
+quarters <- 1:4
+type <- "Electric"
+
+pge_19_elec <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_19_elec <- rbind(pge_19_elec,temp)
+
+  saveRDS(pge_19_elec, "pge_19_elec.rds")
+}
+
+year <- 2020
+quarters <- 1:3
+type <- "Electric"
+
+pge_20_elec <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_20_elec <- rbind(pge_20_elec,temp)
+
+  saveRDS(pge_20_elec, "pge_20_elec.rds")
+}
+
+pge_2017_2020_elec <- rbind(pge_17_elec,pge_18_elec,pge_19_elec,pge_20_elec)
+
+saveRDS(pge_2017_2020_elec, "pge_2017_2020_elec.rds")
+
+pge_res_comm <- filter(pge_2017_2020_elec, CUSTOMERCLASS %in% c("Elec- Residential", "Elec- Commercial"))
+
+pge_select <- select(pge_res_comm, !c(COMBINED, TOTALCUSTOMERS, AVERAGEKWH))
+
+ca_counties <- counties("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+usa_zips <- 
+  zctas(cb = T, progress_bar = F)
+
+bay_zips <-
+  usa_zips %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_set_geometry(NULL) %>% 
+  left_join(usa_zips %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+pge_bay_elec <-
+  pge_select %>%
+  mutate(
+    ZIPCODE = ZIPCODE %>% as.character()
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  )
+
+pge_bay_conversion_elec <- 
+  pge_bay_elec %>%
+  group_by(
+    MONTH, 
+    YEAR, 
+    CUSTOMERCLASS
+  ) %>%
+  summarize(
+    TOTALKWH = sum(TOTALKWH, na.rm = F)
+  ) %>%
+  group_by(
+    MONTH, 
+    YEAR,
+    CUSTOMERCLASS
+  ) %>%
+  summarize(
+    TOTALkBTUs = TOTALKWH*3.41214
+  ) %>%
+  mutate(
+    DATE = YEAR + MONTH/12
+  )
+```
+
+# LOAD GAS DATA
+
+```{r}
+
+year <- 2017
+quarters <- 1:4
+type <- "Gas"
+
+pge_17_gas <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_17_gas <- rbind(pge_17_gas, temp)
+
+  saveRDS(pge_17_gas, "pge_17_gas.rds")
+}
+
+year <- 2018
+quarters <- 1:4
+type <- "Gas"
+
+pge_18_gas <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_18_gas <- rbind(pge_18_gas,temp)
+
+  saveRDS(pge_18_gas, "pge_18_gas.rds")
+}
+
+year <- 2019
+quarters <- 1:4
+type <- "Gas"
+
+pge_19_gas <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_19_gas <- rbind(pge_19_gas,temp)
+
+  saveRDS(pge_19_gas, "pge_19_gas.rds")
+}
+
+year <- 2020
+quarters <- 1:3
+type <- "Gas"
+
+pge_20_gas <- NULL
+
+for(quarter in quarters) {
+  
+  filename <- 
+    paste0(
+      "PGE_",
+      year,
+      "_Q",
+      quarter,
+      "_",
+      type,
+      "UsageByZip.csv"
+    )
+
+  print(filename)
+  
+  temp <- read_csv(filename)
+  
+  pge_20_gas <- rbind(pge_20_gas,temp)
+
+  saveRDS(pge_20_gas, "pge_20_gas.rds")
+}
+
+pge_2017_2020_gas <- rbind(pge_17_gas,pge_18_gas,pge_19_gas,pge_20_gas)
+
+saveRDS(pge_2017_2020_gas, "pge_2017_2020_gas.rds")
+
+pge_res_comm_gas <- filter(pge_2017_2020_gas, CUSTOMERCLASS %in% c("Gas- Residential", "Gas- Commercial"))
+
+pge_select_gas <- select(pge_res_comm_gas, !c(COMBINED, TOTALCUSTOMERS, AVERAGETHM))
+
+ca_counties <- counties("CA", cb = T, progress_bar = F)
+
+bay_county_names <-
+  c(
+    "Alameda",
+    "Contra Costa",
+    "Marin",
+    "Napa",
+    "San Francisco",
+    "San Mateo",
+    "Santa Clara",
+    "Solano",
+    "Sonoma"
+  )
+
+bay_counties <-
+  counties("CA", cb = T, progress_bar = F) %>%
+  filter(NAME %in% bay_county_names)
+
+usa_zips <- 
+  zctas(cb = T, progress_bar = F)
+
+bay_zips <-
+  usa_zips %>% 
+  st_centroid() %>% 
+  .[bay_counties, ] %>% 
+  st_set_geometry(NULL) %>% 
+  left_join(usa_zips %>% select(GEOID10)) %>% 
+  st_as_sf()
+
+pge_bay_gas <-
+  pge_select_gas %>%
+  mutate(
+    ZIPCODE = ZIPCODE %>% as.character()
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  )
+
+pge_bay_conversion_gas <- 
+  pge_bay_gas %>%
+  group_by(
+    MONTH, 
+    YEAR, 
+    CUSTOMERCLASS
+  ) %>%
+  summarize(
+    TOTALTHM = sum(TOTALTHM, na.rm = F)
+  ) %>%
+  group_by(
+    MONTH, 
+    YEAR,
+    CUSTOMERCLASS
+  ) %>%
+  summarize(
+    TOTALkBTUs = TOTALTHM*99.9761
+  ) %>%
+  mutate(
+    DATE = YEAR + MONTH/12
+  )
+
+```
+
+# Combining datasets and Plotting!
+```{r}
+
+pge_bay_chart_data <- rbind(pge_bay_conversion_elec, pge_bay_conversion_gas)
+
+pge_bay_chart <-
+  pge_bay_chart_data %>% 
+  ggplot() +
+  geom_bar(
+    aes(
+      x = DATE %>% factor(),
+      y = TOTALkBTUs,
+      fill = CUSTOMERCLASS
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  labs(
+    x = "Date",
+    y = "kBTU",
+    title = "PG&E Bay Area Residential & Commercial Electricity & Gas Usage
+                                  (2017-Present)",
+    fill = "Energy/Source"
+  ) + 
+  scale_x_discrete(
+    breaks = 
+      seq(
+        2016,
+        2020,
+        1
+      )
+  )
+
+pge_bay_chart
+
+```
+
+# Analysis of Changes in Energy Usage (in kBTU) of Bay Area Zipcodes as a Result of the COVID-19 Pandemic
+
+Roughly speaking based on the chart above, the COVID-19 Pandemic does not seem to have affected the overall energy consumption too all that great of an extent throughout the Bay Area. One might expect greater changes in the proportion of Commercial to Residential energy usage as shelter-in-place orders began rolling out throughout California in late March (the third bar of 2020), and it does seem likely that the overall commercial energy usage decreased during the period directly following. 
+
+It is curious, however, that September of 2017 saw such a massive increase in usage while COVID-19 had a much lesser effect on the Bay Area. Lastly, and this is just a random thought--I wonder if analysis of changes in energy consumption patterns could be used as another measure of resiliency for urban areas in light of a disaster/major event. I'm sure it would be quite interesting to analyze the changes in both overall usage as well as proportion of usage by customer class.
+
+# Changes in Energy Use by Zipcode in the Bay Area as a Result of COVID-19
+
+This section includes three maps which will help analyze the effects that the COVID-19 pandemic has had on energy consumption throughout the bay area. The first two maps are meant to be juxtaposed directly: the first displays the total energy consumption (in kBTUs) by zipcode for April of 2020, and the second does the same with an average total for April consumption based on 2017-2019 data. These two maps are mainly supplied in order to get an idea of where energy is being used the most throughout the bay area in general, and where we should expect larger volumes of energy consumption based on past data. 
+```{r}
+
+pge_bay_eleckbtu <-
+  pge_bay_elec %>%
+  group_by(
+    ZIPCODE,
+    MONTH,
+    YEAR,
+    CUSTOMERCLASS
+  ) %>%
+  summarize(
+    TOTALkBTUs = TOTALKWH*3.41214
+  ) %>%
+  mutate(
+    ZIPCODE = ZIPCODE %>% as.character()
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  )
+
+pge_bay_gaskbtu <-
+  pge_bay_gas %>%
+  group_by(
+    ZIPCODE,
+    MONTH,
+    YEAR,
+    CUSTOMERCLASS
+  ) %>%
+  summarize(
+    TOTALkBTUs = TOTALTHM*99.9761
+  ) %>%
+  mutate(
+    ZIPCODE = ZIPCODE %>% as.character()
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  )
+
+bay_zips_energy <- rbind(pge_bay_eleckbtu, pge_bay_gaskbtu)
+
+zipcodes <- bay_zips$GEOID10
+
+april_kbtu_by_zip <- NULL
+temp <- NULL
+
+
+  for(zipcode in zipcodes) {
+    temp <-
+      bay_zips_energy %>%
+        filter(ZIPCODE == zipcode) %>%
+        filter(MONTH == 4) %>%
+        group_by(
+          ZIPCODE,
+          YEAR
+        ) %>%
+        summarize(
+          TOTALkBTUs = sum(TOTALkBTUs, na.rm = T)
+        )
+      
+    april_kbtu_by_zip <- rbind(april_kbtu_by_zip, temp)
+    }
+  
+        
+kbtu_by_zip_2020  <- 
+  april_kbtu_by_zip %>%
+  filter(YEAR == "2020") %>%
+  select(ZIPCODE, TOTALkBTUs) %>%
+  filter(
+    ZIPCODE != "95112"
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  ) %>% 
+  st_as_sf() %>% 
+  st_transform(4326)
+    
+kbtu_by_zip_2020_minus95112  <- 
+  april_kbtu_by_zip %>%
+  filter(YEAR == "2020") %>%
+  select(ZIPCODE, TOTALkBTUs) %>%
+  filter(
+    ZIPCODE != "95112"
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  ) %>% 
+  st_as_sf() %>% 
+  st_transform(4326)
+
+kbtu_by_zip_171819 <- 
+  april_kbtu_by_zip %>%
+  filter(
+    YEAR != "2020"
+  ) %>%
+  group_by(
+    ZIPCODE
+  ) %>%
+  summarize(
+    TOTALkBTUs = mean(TOTALkBTUs)
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  ) %>% 
+  st_as_sf() %>% 
+  st_transform(4326)
+
+res_pal <- colorNumeric(
+  palette = "Blues",
+  domain = 
+    kbtu_by_zip_2020$TOTALkBTUs
+)
+
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(
+    data = kbtu_by_zip_2020,
+    fillColor = ~res_pal(TOTALkBTUs),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(TOTALkBTUs), 
+      " kBTU total in ",
+      ZIPCODE
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = kbtu_by_zip_2020,
+    pal = res_pal,
+    values = ~TOTALkBTUs,
+    title = "Total kBTU Usage by Zipcode 
+                    April, 2020"
+  )
+```
+
+```{r}
+res_pal <- colorNumeric(
+  palette = "Blues",
+  domain = 
+    kbtu_by_zip_171819$TOTALkBTUs
+)
+
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(
+    data = kbtu_by_zip_171819,
+    fillColor = ~res_pal(TOTALkBTUs),
+    color = "white",
+    opacity = 0.5,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(TOTALkBTUs), 
+      " kBTU total in Zipcode ",
+      ZIPCODE
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = kbtu_by_zip_171819,
+    pal = res_pal,
+    values = ~TOTALkBTUs,
+    title = "2017-2019 April Average kBTU Usage by Zipcode"
+  )
+```
+In all honestly, it is difficult to make use of these maps to draw any meaningful conclusion about the changes in consumption throughout the bay area, so I created another one, which is the overall change in energy consumption for the month of April between 2020 and the 2017-2019 average. This last visual can be found below:
+
+
+```{r}
+
+
+test <-
+  april_kbtu_by_zip %>%
+  filter(YEAR != "2020") %>%
+  group_by(
+    ZIPCODE
+  ) %>%
+  summarize(TOTALkBTUs171819 = mean(TOTALkBTUs))
+test1 <-
+  april_kbtu_by_zip %>%
+  filter(YEAR == "2020") %>%
+  group_by(
+    ZIPCODE
+  ) %>%
+  summarize(TOTALkBTUs2020 = mean(TOTALkBTUs))
+test2 <- left_join(test,test1)
+test3 <- 
+  test2 %>%
+  group_by(ZIPCODE
+  ) %>%
+  summarize(kBTU_PCT_CHANGE = ((TOTALkBTUs2020 - TOTALkBTUs171819)/TOTALkBTUs171819)*100
+  ) %>%
+  mutate(
+    ZIPCODE = ZIPCODE %>% as.character()
+  ) %>%
+  right_join(
+    bay_zips %>% select(GEOID10),
+    by = c("ZIPCODE" = "GEOID10")
+  ) %>%
+  filter(!is.na(kBTU_PCT_CHANGE)) %>%
+  st_as_sf()
+
+res_pal <- colorNumeric(
+  palette = "RdYlBu",
+  domain = -600:600
+)
+
+leaflet() %>% 
+  addTiles() %>% 
+  addPolygons(
+    data = test3,
+    fillColor = ~res_pal(kBTU_PCT_CHANGE),
+    color = "white",
+    opacity = 0.1,
+    fillOpacity = 0.5,
+    weight = 1,
+    label = ~paste0(
+      round(kBTU_PCT_CHANGE), 
+      " % Change in Gas/ELectric Usage in ",
+      ZIPCODE
+    ),
+    highlightOptions = highlightOptions(
+      weight = 2,
+      opacity = 1
+    )
+  ) %>% 
+  addLegend(
+    data = test3,
+    pal = res_pal,
+    values = ~kBTU_PCT_CHANGE,
+    title = "% Change in Gas/Electric Usage: 2020 vs. 2017-2019 Average"
+  )    
+        
+
+```
+
+This map makes one thing very clear that the others did not: a few select locales, including downtown San Jose, parts of Alameda, and a few chunks of Marin County, saw significantly increased levels of energy consumption. I would like to attribute this largely to the massive numbers of layoffs which much of the country saw as a result of COVID-19 health & safety restrictions, and understanding that San Jose is home to many disadvantaged communities which may have been more likely to be affected by these layoffs. This would drive people away from work (and using electricity a distance from where one lives) and back home to wait out the pandemic.
